@@ -19,7 +19,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: cal-diy
-          image: ghcr.io/example-org/cal-diy@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          image: ${IMAGE_REF}
           ports:
             - name: http
               containerPort: 8080
@@ -36,3 +36,10 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi

@@ -7,6 +7,7 @@ spec:
   background: false
   webhookConfiguration:
     failurePolicy: Fail
+    timeoutSeconds: 30
   rules:
     - name: verify-signature-and-provenance
       match:
@@ -14,9 +15,12 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
       verifyImages:
         - imageReferences:
-            - "ghcr.io/example-org/cal-diy@sha256:*"
+            - "${IMAGE_REPOSITORY}@sha256:*"
           required: true
           mutateDigest: false
           verifyDigest: true
@@ -25,11 +29,24 @@ spec:
               entries:
                 - keyless:
                     issuer: https://token.actions.githubusercontent.com
-                    subject: "https://github.com/example-org/cal-diy/.github/workflows/build-image.yml@refs/heads/main"
+                    subject: "https://github.com/${SOURCE_REPOSITORY}/${WORKFLOW_PATH}@${SOURCE_REF}"
+        - imageReferences:
+            - "${IMAGE_REPOSITORY}@sha256:*"
+          type: SigstoreBundle
+          required: true
+          mutateDigest: false
+          verifyDigest: true
           attestations:
-            - predicateType: https://slsa.dev/provenance/v1
+            - type: https://slsa.dev/provenance/v1
               attestors:
                 - entries:
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
-                        subject: "https://github.com/example-org/cal-diy/.github/workflows/build-image.yml@refs/heads/main"
+                        subject: "https://github.com/${SOURCE_REPOSITORY}/${WORKFLOW_PATH}@${SOURCE_REF}"
+                        rekor:
+                          url: https://rekor.sigstore.dev
+              conditions:
+                - all:
+                    - key: "{{ buildDefinition.buildType }}"
+                      operator: Equals
+                      value: https://actions.github.io/buildtypes/workflow/v1

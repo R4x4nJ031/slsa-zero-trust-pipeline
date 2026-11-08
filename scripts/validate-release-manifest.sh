@@ -14,14 +14,4 @@ if [[ ! -f "$manifest" ]]; then
   exit 2
 fi
 
-if command -v ajv >/dev/null 2>&1; then
-  validator=(ajv)
-elif command -v npx >/dev/null 2>&1; then
-  validator=(npx --yes ajv-cli)
-else
-  printf 'missing required command: ajv or npx\n' >&2
-  printf 'install Node.js, then rerun this test\n' >&2
-  exit 2
-fi
-
-"${validator[@]}" validate -s "$schema" -d "$manifest" --spec=draft2020
+python3 "$(dirname "$0")/validate_release_manifest.py" "$schema" "$manifest"

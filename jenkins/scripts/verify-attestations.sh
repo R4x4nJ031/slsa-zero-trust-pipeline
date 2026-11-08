@@ -2,12 +2,16 @@
 set -euo pipefail
 
 image="$(jq -r '.artifact.repository + "@" + .artifact.digest' reports/release-manifest.json)"
-: "${COSIGN_CERT_IDENTITY:?COSIGN_CERT_IDENTITY is required}"
-: "${COSIGN_CERT_OIDC_ISSUER:?COSIGN_CERT_OIDC_ISSUER is required}"
+repository="$(jq -r '.source.repository' reports/release-manifest.json)"
+workflow="$(jq -r '.builder.workflow' reports/release-manifest.json)"
+ref="$(jq -r '.source.ref' reports/release-manifest.json)"
+identity="https://github.com/${repository}/${workflow}@${ref}"
+issuer="https://token.actions.githubusercontent.com"
 
-cosign verify-attestation "$image" --type slsaprovenance \
-  --certificate-identity "$COSIGN_CERT_IDENTITY" \
-  --certificate-oidc-issuer "$COSIGN_CERT_OIDC_ISSUER"
+gh attestation verify "oci://${image}" --repo "$repository" \
+  --signer-workflow "${repository}/${workflow}" --source-ref "$ref" --format json \
+  > reports/provenance-verification.json
+
 cosign verify-attestation "$image" --type cyclonedx \
-  --certificate-identity "$COSIGN_CERT_IDENTITY" \
-  --certificate-oidc-issuer "$COSIGN_CERT_OIDC_ISSUER"
+  --certificate-identity "$identity" \
+  --certificate-oidc-issuer "$issuer" > reports/sbom-verification.json

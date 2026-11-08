@@ -6,8 +6,9 @@ valid_input := {
   "provenance": {"verified": true},
   "sbom": {"verified": true},
   "tests": {"passed": true},
-  "image": {"digest": "sha256:abc"},
-  "trivy": {"critical_count": 0}
+  "dast": {"passed": true},
+  "image": {"digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "trivy": {"critical_count": 0, "high_count": 0}
 }
 
 test_valid_release if {
@@ -21,4 +22,18 @@ test_unsigned_release_denied if {
 
 test_critical_release_denied if {
   not allow with input as object.union(valid_input, {"trivy": {"critical_count": 1}})
+}
+
+test_high_release_denied if {
+  not allow with input as object.union(valid_input, {"trivy": {"critical_count": 0, "high_count": 1}})
+}
+
+test_dast_failure_denied if {
+  not allow with input as object.union(valid_input, {"dast": {"passed": false}})
+  "DAST baseline failed" in deny with input as object.union(valid_input, {"dast": {"passed": false}})
+}
+
+test_invalid_digest_denied if {
+  not allow with input as object.union(valid_input, {"image": {"digest": "latest"}})
+  "image digest is missing or invalid" in deny with input as object.union(valid_input, {"image": {"digest": "latest"}})
 }

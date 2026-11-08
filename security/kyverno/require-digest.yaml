@@ -12,13 +12,18 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
       validate:
         message: Images must be referenced by an immutable sha256 digest.
         foreach:
-          - list: request.object.spec.containers[]
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.image }}"
-                    operator: AnyNotIn
-                    value: "*@sha256:*"
+          - list: request.object.spec.containers
+            pattern:
+              image: "*@sha256:*"
+          - list: request.object.spec.initContainers
+            pattern:
+              image: "*@sha256:*"
+          - list: request.object.spec.ephemeralContainers
+            pattern:
+              image: "*@sha256:*"

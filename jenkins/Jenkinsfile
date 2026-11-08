@@ -7,37 +7,63 @@ pipeline {
   }
 
   parameters {
-    string(name: 'RELEASE_MANIFEST_URL', description: 'Trusted locator for the candidate manifest')
-  }
-
-  environment {
-    COSIGN_EXPERIMENTAL = '1'
+    string(name: 'RELEASE_REPOSITORY', description: 'GitHub OWNER/REPO that produced the candidate')
+    string(name: 'RELEASE_RUN_ID', description: 'GitHub Actions run ID containing candidate evidence')
+    string(name: 'RELEASE_COMMIT', description: '40-character source commit SHA')
   }
 
   stages {
     stage('Retrieve') {
       steps {
-        sh 'test -n "$RELEASE_MANIFEST_URL"'
-        sh './jenkins/scripts/retrieve-manifest.sh "$RELEASE_MANIFEST_URL"'
+        withCredentials([string(credentialsId: 'github-read-token', variable: 'GH_TOKEN')]) {
+          sh './jenkins/scripts/retrieve-manifest.sh "$RELEASE_REPOSITORY" "$RELEASE_RUN_ID" "$RELEASE_COMMIT"'
+        }
       }
     }
     stage('Verify manifest shape') {
-      steps { sh './scripts/validate-release-manifest.sh reports/release-manifest.json' }
+      steps {
+        sh './scripts/validate-release-manifest.sh reports/release-manifest.json'
+        sh '''
+          test "$(jq -r '.source.repository' reports/release-manifest.json)" = "$RELEASE_REPOSITORY"
+          test "$(jq -r '.source.commit' reports/release-manifest.json)" = "$RELEASE_COMMIT"
+          test "$(jq -r '.builder.run_id' reports/release-manifest.json)" = "$RELEASE_RUN_ID"
+          expected_image="ghcr.io/$(printf '%s' "$RELEASE_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          test "$(jq -r '.artifact.repository' reports/release-manifest.json)" = "$expected_image"
+        '''
+      }
     }
     stage('Verify signature and identity') {
-      steps { sh './jenkins/scripts/verify-image.sh' }
-    }
-    stage('Verify provenance and SBOM') {
-      steps { sh './jenkins/scripts/verify-attestations.sh' }
+      steps {
+        withCredentials([
+          string(credentialsId: 'github-read-token', variable: 'GH_TOKEN'),
+          usernamePassword(credentialsId: 'ghcr-readonly', usernameVariable: 'GHCR_USERNAME', passwordVariable: 'GHCR_TOKEN')
+        ]) {
+          sh '''
+            export DOCKER_CONFIG="$(mktemp -d)"
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true; rm -rf "$DOCKER_CONFIG"' EXIT
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USERNAME" --password-stdin
+            ./jenkins/scripts/verify-image.sh
+            ./jenkins/scripts/verify-attestations.sh
+          '''
+        }
+      }
     }
     stage('Deploy exact digest to staging') {
       steps { sh './jenkins/scripts/deploy-staging.sh' }
     }
     stage('Smoke test') {
-      steps { sh 'curl --fail --retry 5 --retry-delay 2 http://staging.example.invalid/healthz' }
+      steps { sh './jenkins/scripts/smoke-test-staging.sh' }
+    }
+    stage('DAST baseline') {
+      steps { sh './jenkins/scripts/run-dast.sh' }
     }
     stage('Evaluate release policy') {
-      steps { sh './jenkins/scripts/evaluate-policy.sh' }
+      steps {
+        sh './jenkins/scripts/build-policy-input.sh'
+        withEnv(['OPA_INPUT=reports/policy-input.json']) {
+          sh './jenkins/scripts/evaluate-policy.sh'
+        }
+      }
     }
     stage('Approval') {
       steps { input message: 'Promote the verified digest?', ok: 'Promote' }

@@ -1,3 +1,5 @@
 reports/*
 !reports/.gitkeep
 .env
+__pycache__/
+*.py[cod]

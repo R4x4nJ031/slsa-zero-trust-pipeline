@@ -1,0 +1,18 @@
+rules:
+  - id: javascript-no-eval
+    languages: [javascript]
+    severity: ERROR
+    message: Avoid eval because it can execute attacker-controlled input.
+    metadata:
+      category: security
+      cwe: CWE-95
+    pattern: eval(...)
+
+  - id: javascript-no-function-constructor
+    languages: [javascript]
+    severity: ERROR
+    message: Avoid the Function constructor because it dynamically executes code.
+    metadata:
+      category: security
+      cwe: CWE-95
+    pattern: new Function(...)

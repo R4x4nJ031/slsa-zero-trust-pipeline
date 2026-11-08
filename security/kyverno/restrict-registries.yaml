@@ -12,14 +12,18 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
       validate:
         message: Images must come from the approved GHCR repository.
         foreach:
-          - list: request.object.spec.containers[]
-            deny:
-              conditions:
-                any:
-                  - key: "{{ element.image }}"
-                    operator: AnyNotIn
-                    value:
-                      - "ghcr.io/example-org/cal-diy@*"
+          - list: request.object.spec.containers
+            pattern:
+              image: "${IMAGE_REPOSITORY}@sha256:*"
+          - list: request.object.spec.initContainers
+            pattern:
+              image: "${IMAGE_REPOSITORY}@sha256:*"
+          - list: request.object.spec.ephemeralContainers
+            pattern:
+              image: "${IMAGE_REPOSITORY}@sha256:*"

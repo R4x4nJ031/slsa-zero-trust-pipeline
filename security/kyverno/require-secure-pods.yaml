@@ -12,19 +12,63 @@ spec:
           - resources:
               kinds:
                 - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
       validate:
         message: Privileged containers are not allowed.
         pattern:
           spec:
             =(containers):
               - =(securityContext):
-                  =(privileged): "false"
+                  =(privileged): false
+    - name: disallow-privileged-init-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
+      validate:
+        message: Privileged init containers are not allowed.
+        foreach:
+          - list: request.object.spec.initContainers
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.privileged || `false` }}"
+                    operator: Equals
+                    value: true
+    - name: disallow-privileged-ephemeral-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
+      validate:
+        message: Privileged ephemeral containers are not allowed.
+        foreach:
+          - list: request.object.spec.ephemeralContainers
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.securityContext.privileged || `false` }}"
+                    operator: Equals
+                    value: true
     - name: require-non-root
       match:
         any:
           - resources:
               kinds:
                 - Pod
+              namespaceSelector:
+                matchLabels:
+                  slsa-zero-trust: "true"
       validate:
         message: Containers must run as non-root users.
         pattern:
