@@ -48,14 +48,21 @@ jobs:
         run: mkdir -p reports && syft "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}" -o cyclonedx-json=reports/sbom.cdx.json
 
       - name: Scan image for vulnerabilities
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ steps.image_name.outputs.repository }}@${{ steps.image.outputs.digest }}
-          format: json
-          output: reports/trivy.json
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: 1
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image_name.outputs.repository }}
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$HOME/.docker:/root/.docker:ro" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            aquasec/trivy:0.76.2 image \
+            --format json \
+            --output reports/trivy.json \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --exit-code 1 \
+            "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
