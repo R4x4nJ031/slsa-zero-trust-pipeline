@@ -47,6 +47,16 @@ jobs:
           IMAGE_REPOSITORY: ${{ steps.image_name.outputs.repository }}
         run: mkdir -p reports && syft "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}" -o cyclonedx-json=reports/sbom.cdx.json
 
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ steps.image_name.outputs.repository }}@${{ steps.image.outputs.digest }}
+          format: json
+          output: reports/trivy.json
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
@@ -54,6 +64,11 @@ jobs:
         env:
           IMAGE_REPOSITORY: ${{ steps.image_name.outputs.repository }}
         run: cosign sign --yes "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}"
+
+      - name: Attest SBOM by digest
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image_name.outputs.repository }}
+        run: cosign attest --yes --type cyclonedx --predicate reports/sbom.cdx.json "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}"
 
       - name: Generate release manifest
         env:
