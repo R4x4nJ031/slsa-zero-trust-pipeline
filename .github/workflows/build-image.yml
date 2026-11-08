@@ -74,7 +74,7 @@ jobs:
             --output reports/trivy.json \
             --severity CRITICAL,HIGH \
             --ignore-unfixed \
-            --exit-code 1 \
+            --exit-code 0 \
             "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}"
 
       - name: Generate release manifest
@@ -93,6 +93,14 @@ jobs:
           name: release-evidence-${{ github.sha }}
           path: reports/
           if-no-files-found: error
+
+      - name: Enforce vulnerability gate
+        run: |
+          critical=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL")] | length' reports/trivy.json)
+          high=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity == "HIGH")] | length' reports/trivy.json)
+          printf 'Trivy findings: critical=%s high=%s\n' "$critical" "$high"
+          test "$critical" -eq 0
+          test "$high" -eq 0
 
   sign-and-attest:
     needs: build-and-scan
