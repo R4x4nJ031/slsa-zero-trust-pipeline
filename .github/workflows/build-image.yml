@@ -39,13 +39,19 @@ jobs:
           tags: ${{ steps.image_name.outputs.repository }}:${{ github.sha }}
           labels: org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: Install Syft
-        uses: anchore/sbom-action/download-syft@v0
-
       - name: Generate SBOM
         env:
           IMAGE_REPOSITORY: ${{ steps.image_name.outputs.repository }}
-        run: mkdir -p reports && syft "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}" -o cyclonedx-json=reports/sbom.cdx.json
+        run: |
+          mkdir -p reports
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$HOME/.docker:/root/.docker:ro" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            anchore/syft:v1.57.0 \
+            "${IMAGE_REPOSITORY}@${{ steps.image.outputs.digest }}" \
+            -o cyclonedx-json=reports/sbom.cdx.json
 
       - name: Scan image for vulnerabilities
         env:
