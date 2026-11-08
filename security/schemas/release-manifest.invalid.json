@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "release_id": "invalid-release",
+  "source": {
+    "repository": "example-org/cal-diy",
+    "commit": "not-a-commit",
+    "ref": "refs/heads/main"
+  },
+  "builder": {
+    "platform": "unknown-builder",
+    "workflow": ".github/workflows/build-image.yml",
+    "run_id": "123"
+  },
+  "artifact": {
+    "type": "container",
+    "repository": "docker.io/example-org/cal-diy",
+    "digest": "latest"
+  },
+  "evidence": {
+    "signature": "missing",
+    "sbom": "unknown",
+    "provenance": "missing"
+  },
+  "status": "candidate"
+}

@@ -1,0 +1,53 @@
+pipeline {
+  agent { label 'isolated-security-agent' }
+
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+  }
+
+  parameters {
+    string(name: 'RELEASE_MANIFEST_URL', description: 'Trusted locator for the candidate manifest')
+  }
+
+  environment {
+    COSIGN_EXPERIMENTAL = '1'
+  }
+
+  stages {
+    stage('Retrieve') {
+      steps {
+        sh 'test -n "$RELEASE_MANIFEST_URL"'
+        sh './jenkins/scripts/retrieve-manifest.sh "$RELEASE_MANIFEST_URL"'
+      }
+    }
+    stage('Verify manifest shape') {
+      steps { sh './scripts/validate-release-manifest.sh reports/release-manifest.json' }
+    }
+    stage('Verify signature and identity') {
+      steps { sh './jenkins/scripts/verify-image.sh' }
+    }
+    stage('Verify provenance and SBOM') {
+      steps { sh './jenkins/scripts/verify-attestations.sh' }
+    }
+    stage('Deploy exact digest to staging') {
+      steps { sh './jenkins/scripts/deploy-staging.sh' }
+    }
+    stage('Smoke test') {
+      steps { sh 'curl --fail --retry 5 --retry-delay 2 http://staging.example.invalid/healthz' }
+    }
+    stage('Evaluate release policy') {
+      steps { sh './jenkins/scripts/evaluate-policy.sh' }
+    }
+    stage('Approval') {
+      steps { input message: 'Promote the verified digest?', ok: 'Promote' }
+    }
+    stage('Promote exact digest') {
+      steps { sh './jenkins/scripts/deploy-production.sh' }
+    }
+  }
+
+  post {
+    always { archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true }
+  }
+}

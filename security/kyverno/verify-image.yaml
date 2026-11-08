@@ -1,0 +1,35 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-cal-diy-image
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+  rules:
+    - name: verify-signature-and-provenance
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/example-org/cal-diy@sha256:*"
+          required: true
+          mutateDigest: false
+          verifyDigest: true
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    issuer: https://token.actions.githubusercontent.com
+                    subject: "https://github.com/example-org/cal-diy/.github/workflows/build-image.yml@refs/heads/main"
+          attestations:
+            - predicateType: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: "https://github.com/example-org/cal-diy/.github/workflows/build-image.yml@refs/heads/main"

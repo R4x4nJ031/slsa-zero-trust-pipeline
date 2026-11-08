@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "release_id": "example-release-001",
+  "source": {
+    "repository": "example-org/cal-diy",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "ref": "refs/heads/main"
+  },
+  "builder": {
+    "platform": "github-actions",
+    "workflow": ".github/workflows/build-image.yml",
+    "run_id": "123456789"
+  },
+  "artifact": {
+    "type": "container",
+    "repository": "ghcr.io/example-org/cal-diy",
+    "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "evidence": {
+    "signature": "cosign",
+    "sbom": "cyclonedx",
+    "provenance": "slsa"
+  },
+  "status": "candidate"
+}

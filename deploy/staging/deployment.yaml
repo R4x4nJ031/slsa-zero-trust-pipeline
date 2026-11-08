@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cal-diy
+  namespace: staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cal-diy
+  template:
+    metadata:
+      labels:
+        app: cal-diy
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cal-diy
+          image: ghcr.io/example-org/cal-diy@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

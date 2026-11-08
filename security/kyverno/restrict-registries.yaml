@@ -1,0 +1,25 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: only-approved-registry
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: Images must come from the approved GHCR repository.
+        foreach:
+          - list: request.object.spec.containers[]
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.image }}"
+                    operator: AnyNotIn
+                    value:
+                      - "ghcr.io/example-org/cal-diy@*"

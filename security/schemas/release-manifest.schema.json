@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/slsa-zero-trust/release-manifest.schema.json",
+  "title": "Release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "release_id", "source", "builder", "artifact", "evidence", "status"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "release_id": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "ref"],
+      "properties": {
+        "repository": { "type": "string", "pattern": "^[^/\\s]+/[^/\\s]+$" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "ref": { "type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$" }
+      }
+    },
+    "builder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "workflow", "run_id"],
+      "properties": {
+        "platform": { "const": "github-actions" },
+        "workflow": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._/-]+\\.ya?ml$" },
+        "run_id": { "type": "string", "pattern": "^[0-9]+$" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "repository", "digest"],
+      "properties": {
+        "type": { "const": "container" },
+        "repository": { "type": "string", "pattern": "^ghcr\\.io/[^/\\s]+/[^/\\s]+$" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signature", "sbom", "provenance"],
+      "properties": {
+        "signature": { "const": "cosign" },
+        "sbom": { "const": "cyclonedx" },
+        "provenance": { "const": "slsa" }
+      }
+    },
+    "status": { "enum": ["candidate", "released", "rejected"] }
+  }
+}
