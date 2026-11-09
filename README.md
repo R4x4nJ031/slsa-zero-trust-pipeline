@@ -23,13 +23,16 @@ Requirements: Bash, Python 3, Node.js 22 or newer, Docker, OPA, `jq`, and (for t
 make test
 make policy
 make build
+make scan
 ```
 
-`make test` runs the manifest contract tests, service tests, and shell syntax checks. The manifest validator uses only Python's standard library and does not download dependencies. The sample service has no third-party Node dependencies; Syft records the final image contents and Trivy scans the published image.
+`make test` runs manifest validation, the service tests, and shell syntax checks. `make build` builds the local image. `make scan` uses Trivy in Docker to scan that image and fails on HIGH or CRITICAL findings with a fix available; `make scan-config` scans Docker and Kubernetes configuration. The manifest validator uses only Python's standard library and does not download dependencies. The reference service has no third-party Node dependencies; Syft records the final image contents and Trivy scans the published image.
 
 ## Configure GitHub Actions
 
-The workflows use the built-in `GITHUB_TOKEN`. The package must permit Actions to publish images to GHCR. Build and signing jobs run only for `main`; pull requests get only the read-only contract workflow.
+The workflows use the built-in `GITHUB_TOKEN`. In repository settings, allow Actions to publish packages to GHCR. Build and signing jobs run only for pushes to `main`; pull requests run the read-only source security and release-contract checks. The package should be public for the unauthenticated Kind lab. Protect `main` with required checks for `source-security` and `validate-release-contract`, and require review for changes to workflow and security policy files.
+
+For GitHub organizations that require a Gitleaks license, add `GITLEAKS_LICENSE` as an Actions secret. Personal accounts and public repositories can leave it unset.
 
 To have a successful signed candidate trigger Jenkins, add these repository Actions secrets:
 
@@ -40,6 +43,13 @@ To have a successful signed candidate trigger Jenkins, add these repository Acti
 | `JENKINS_API_TOKEN` | Jenkins API token for that user |
 
 If all three are absent, the build still publishes evidence and simply skips the Jenkins notification.
+
+When Jenkins triggering is enabled, also add these Actions repository variables (Settings → Secrets and variables → Actions → Variables):
+
+| Variable | Value |
+| --- | --- |
+| `STAGING_KUBE_CONTEXT` | The kubeconfig context name Jenkins should use for staging |
+| `PRODUCTION_KUBE_CONTEXT` | The kubeconfig context name Jenkins should use for production |
 
 ## Configure Jenkins
 
@@ -52,17 +62,16 @@ Add these Jenkins credentials:
 | `github-read-token` | Secret text | Read Actions artifacts and attestations in this repository |
 | `ghcr-readonly` | Username/password | GHCR username and a token with `read:packages` |
 
-The GitHub notification passes the repository, workflow run ID, and commit. Jenkins downloads the `release-evidence-<commit>` artifact from that run; it never accepts a caller-supplied image repository or tag.
+The GitHub workflow passes the context names into Jenkins as build parameters. Use the exact names returned by `kubectl config get-contexts`. The Jenkins scripts always select those contexts explicitly; they do not rely on whichever context happens to be active. The isolated agent also needs registry pull access from its cluster nodes, or the GHCR package must be public.
+
+The GitHub notification passes the repository, workflow run ID, and commit. Jenkins downloads the `release-evidence-<commit>` artifact from that run; it never accepts a caller-supplied image repository or tag. Configure the `JENKINS_*` Actions secrets above to enable automatic triggering.
 
 ## Run the Kind and Kyverno lab
 
 Create the local cluster and install Kyverno:
 
 ```sh
-make kind-cluster
-helm repo add kyverno https://kyverno.github.io/kyverno/
-helm repo update
-helm install kyverno kyverno/kyverno -n kyverno --create-namespace
+make kind-setup
 ```
 
 Render and install policies for your GitHub repository, then deploy a digest from a successful build:
@@ -70,17 +79,12 @@ Render and install policies for your GitHub repository, then deploy a digest fro
 ```sh
 make kind-policies REPOSITORY=OWNER/REPO
 make local-deploy IMAGE=ghcr.io/OWNER/REPO@sha256:YOUR_64_CHARACTER_DIGEST
+make admission-test IMAGE=ghcr.io/OWNER/REPO@sha256:YOUR_64_CHARACTER_DIGEST
 ```
 
 The registry package must be public for an unauthenticated Kind cluster. For a private package, configure an `imagePullSecret` in the `staging` namespace and Kyverno registry credentials before deploying.
 
 Test the enforcement by submitting an unsigned or tag-based image in `staging`; Kyverno should deny admission. A successful workload must use the signed digest from the authorized `main` workflow.
-
-Once the successful image is deployed, run the automated admission checks:
-
-```sh
-make admission-test IMAGE=ghcr.io/OWNER/REPO@sha256:YOUR_64_CHARACTER_DIGEST
-```
 
 The test expects the authorized image to be admitted and tag-based, privileged, and unapproved-registry workloads to be denied.
 

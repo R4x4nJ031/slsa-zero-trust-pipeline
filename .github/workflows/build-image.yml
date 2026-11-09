@@ -62,7 +62,7 @@ jobs:
       - name: Run application tests
         run: |
           mkdir -p reports
-          node --test test/*.test.js
+          make test
           printf '{"passed":true}\n' > reports/tests.json
 
       - name: Scan container and Kubernetes configuration
@@ -213,6 +213,8 @@ jobs:
           JENKINS_JOB_URL: ${{ secrets.JENKINS_JOB_URL }}
           JENKINS_USER: ${{ secrets.JENKINS_USER }}
           JENKINS_API_TOKEN: ${{ secrets.JENKINS_API_TOKEN }}
+          STAGING_KUBE_CONTEXT: ${{ vars.STAGING_KUBE_CONTEXT }}
+          PRODUCTION_KUBE_CONTEXT: ${{ vars.PRODUCTION_KUBE_CONTEXT }}
         run: |
           if [[ -z "$JENKINS_JOB_URL" && -z "$JENKINS_USER" && -z "$JENKINS_API_TOKEN" ]]; then
             echo 'Jenkins trigger is not configured; release candidate remains available as a workflow artifact.'
@@ -221,9 +223,13 @@ jobs:
           [[ "$JENKINS_JOB_URL" == https://* ]] || { echo 'JENKINS_JOB_URL must use HTTPS' >&2; exit 1; }
           : "${JENKINS_USER:?JENKINS_USER must be configured with JENKINS_JOB_URL}"
           : "${JENKINS_API_TOKEN:?JENKINS_API_TOKEN must be configured with JENKINS_JOB_URL}"
+          : "${STAGING_KUBE_CONTEXT:?STAGING_KUBE_CONTEXT repository variable is required when Jenkins is enabled}"
+          : "${PRODUCTION_KUBE_CONTEXT:?PRODUCTION_KUBE_CONTEXT repository variable is required when Jenkins is enabled}"
           curl --fail --silent --show-error --get \
             --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
             --data-urlencode "RELEASE_REPOSITORY=$GITHUB_REPOSITORY" \
             --data-urlencode "RELEASE_RUN_ID=$GITHUB_RUN_ID" \
             --data-urlencode "RELEASE_COMMIT=$GITHUB_SHA" \
+            --data-urlencode "STAGING_KUBE_CONTEXT=$STAGING_KUBE_CONTEXT" \
+            --data-urlencode "PRODUCTION_KUBE_CONTEXT=$PRODUCTION_KUBE_CONTEXT" \
             "$JENKINS_JOB_URL/buildWithParameters"

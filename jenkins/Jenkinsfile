@@ -10,6 +10,8 @@ pipeline {
     string(name: 'RELEASE_REPOSITORY', description: 'GitHub OWNER/REPO that produced the candidate')
     string(name: 'RELEASE_RUN_ID', description: 'GitHub Actions run ID containing candidate evidence')
     string(name: 'RELEASE_COMMIT', description: '40-character source commit SHA')
+    string(name: 'STAGING_KUBE_CONTEXT', defaultValue: '', description: 'kubectl context for staging')
+    string(name: 'PRODUCTION_KUBE_CONTEXT', defaultValue: '', description: 'kubectl context for production')
   }
 
   stages {
@@ -27,6 +29,8 @@ pipeline {
           test "$(jq -r '.source.repository' reports/release-manifest.json)" = "$RELEASE_REPOSITORY"
           test "$(jq -r '.source.commit' reports/release-manifest.json)" = "$RELEASE_COMMIT"
           test "$(jq -r '.builder.run_id' reports/release-manifest.json)" = "$RELEASE_RUN_ID"
+          test "$(jq -r '.source.ref' reports/release-manifest.json)" = 'refs/heads/main'
+          test "$(jq -r '.builder.workflow' reports/release-manifest.json)" = '.github/workflows/build-image.yml'
           expected_image="ghcr.io/$(printf '%s' "$RELEASE_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
           test "$(jq -r '.artifact.repository' reports/release-manifest.json)" = "$expected_image"
         '''
@@ -70,6 +74,9 @@ pipeline {
     }
     stage('Promote exact digest') {
       steps { sh './jenkins/scripts/deploy-production.sh' }
+    }
+    stage('Production smoke test') {
+      steps { sh './jenkins/scripts/smoke-test-production.sh' }
     }
   }
 

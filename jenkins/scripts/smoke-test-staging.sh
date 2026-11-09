@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
+: "${STAGING_KUBE_CONTEXT:?STAGING_KUBE_CONTEXT must name the staging cluster context}"
 
 port="${SMOKE_TEST_PORT:-18080}"
-kubectl -n staging port-forward service/cal-diy "${port}:8080" >/tmp/slsa-staging-port-forward.log 2>&1 &
+kubectl --context "$STAGING_KUBE_CONTEXT" -n staging port-forward service/cal-diy "${port}:8080" >/tmp/slsa-staging-port-forward.log 2>&1 &
 port_forward_pid=$!
 trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
 
